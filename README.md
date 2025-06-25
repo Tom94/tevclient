@@ -83,6 +83,10 @@ with tevclient.Ipc() as tev_ipc:
             time.sleep(0.1)
 ```
 
+## TODO
+
+- [ ] Add `async` API.
+
 ## License
 
 GPLv3; see [LICENSE](LICENSE.txt) for details.
