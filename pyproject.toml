@@ -1,0 +1,49 @@
+[tool.black]
+line-length = 160
+
+[tool.isort]
+profile = "black"
+
+[tool.ruff]
+line-length = 160
+
+[tool.basedpyright]
+reportIgnoreCommentWithoutRule = false
+
+[build-system]
+requires = [
+    "setuptools>=61.2.0",
+    "wheel",
+]
+
+[project]
+name = "tevclient"
+dynamic = ["version"]
+description = "Module for remote-controlling the tev image viewer."
+authors = [{name = "Thomas Müller", email = "tom@94.me"}]
+readme = "README.md"
+requires-python = ">=3.11"
+license = "GPL-3.0-only"
+dependencies = [
+    "numpy",
+]
+classifiers = [
+    "Development Status :: 5 - Production/Stable",
+    "Intended Audience :: Developers",
+    "Topic :: Software Development :: Libraries :: Python Modules",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3.14",
+    "Operating System :: OS Independent",
+]
+
+[project.urls]
+Repository = "https://github.com/Tom94/tevclient"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.dynamic]
+version = {attr = "tevclient.__version__"}
+
