@@ -24,10 +24,10 @@ import time
 
 import numpy as np
 
-import tevclient as tev
+import tevclient
 
 if __name__ == "__main__":
-    with tev.Ipc() as tev_ipc:
+    with tevclient.Ipc() as tev_ipc:
         # Create sample image in one go. The image will have RGB channels (displayed as one layer)
         # as well as a 'Bonus' channel (displayed as another layer)
         image_data = np.full((300, 200, 3), 1.0)
@@ -57,15 +57,15 @@ if __name__ == "__main__":
                 tev_ipc.update_vector_graphics(
                     "Test image 2",
                     [
-                        tev.vg_begin_path(),
-                        tev.vg_rect(x, y, TILE_SIZE, TILE_SIZE),
+                        tevclient.vg_begin_path(),
+                        tevclient.vg_rect(x, y, TILE_SIZE, TILE_SIZE),
                         # Alternatively: draw rectangle manually
-                        # tev.vg_move_to(x, y),
-                        # tev.vg_line_to(x, y + TILE_SIZE),
-                        # tev.vg_line_to(x + TILE_SIZE, y + TILE_SIZE),
-                        # tev.vg_line_to(x + TILE_SIZE, y),
-                        # tev.vg_close_path(),
-                        tev.vg_stroke(),
+                        # tevclient.vg_move_to(x, y),
+                        # tevclient.vg_line_to(x, y + TILE_SIZE),
+                        # tevclient.vg_line_to(x + TILE_SIZE, y + TILE_SIZE),
+                        # tevclient.vg_line_to(x + TILE_SIZE, y),
+                        # tevclient.vg_close_path(),
+                        tevclient.vg_stroke(),
                     ],
                 )
 
