@@ -116,6 +116,115 @@ def vg_rounded_rect_varying(
     return VgCommand(VgCommand.Type.RoundedRectVarying, [x, y, width, height, radius_top_left, radius_top_right, radius_bottom_right, radius_bottom_left])
 
 
+class IpcAsync:
+    def __init__(self, hostname: str = "localhost", port: int = 14158):
+        import asyncio
+
+        self._hostname: str = hostname
+        self._port: int = port
+        self._reader: asyncio.StreamReader | None = None
+        self._writer: asyncio.StreamWriter | None = None
+
+    async def __aenter__(self):
+        import asyncio
+
+        self._reader, self._writer = await asyncio.open_connection(self._hostname, self._port)
+        return self
+
+    async def __aexit__(self, exc_type, exc_val, exc_tb):  # pyright: ignore[reportMissingParameterType, reportUnknownParameterType]
+        if self._reader is None or self._writer is None:
+            raise Exception("Communication was not started")
+
+        self._writer.close()
+        await self._writer.wait_closed()
+
+    async def open_image(self, path: str, channel_selector: str = "", grab_focus: bool = True):
+        """
+        Opens an image from a specified path from the disk of the machine tev is running on.
+        """
+
+        if self._writer is None:
+            raise Exception("Communication was not started")
+
+        self._writer.write(packet.open_image(path, channel_selector, grab_focus))
+        await self._writer.drain()
+
+    async def reload_image(self, name: str, grab_focus: bool = True):
+        """
+        Reloads the image with specified path from the disk of the machine tev is running on.
+        """
+
+        if self._writer is None:
+            raise Exception("Communication was not started")
+
+        self._writer.write(packet.reload_image(name, grab_focus))
+        await self._writer.drain()
+
+    async def close_image(self, name: str):
+        """
+        Closes a specified image.
+        """
+
+        if self._writer is None:
+            raise Exception("Communication was not started")
+
+        self._writer.write(packet.close_image(name))
+        await self._writer.drain()
+
+    async def create_image(self, name: str, width: int, height: int, channel_names: list[str] | None = None, grab_focus: bool = True):
+        """
+        Create a blank image with a specified size and a specified set of channel names. "R", "G", "B" [, "A"] is what should be used if an image is rendered.
+        """
+
+        if self._writer is None:
+            raise Exception("Communication was not started")
+
+        self._writer.write(packet.create_image(name, width, height, channel_names, grab_focus))
+        await self._writer.drain()
+
+    async def update_image(
+        self,
+        name: str,
+        image: Tile,
+        channel_names: list[str] | None = None,
+        x: int = 0,
+        y: int = 0,
+        grab_focus: bool = False,
+        perform_tiling: bool = True,
+    ):
+        """
+        Updates the pixel values of a specified image region and a specified set of channels. The `image` parameter must be laid out in row-major format, i.e.
+        from most to least significant: [row][col][channel], where the channel axis is optional.
+        """
+
+        if self._writer is None:
+            raise Exception("Communication was not started")
+
+        if len(image.shape) < 2 or len(image.shape) > 3:
+            raise Exception("Image must be 2D or 3D (with channels)")
+
+        # Break down image into tiles of manageable size for typical TCP packets
+        tile_size = [128, 128] if perform_tiling else image.shape[0:2]
+        for i in range(0, image.shape[0], tile_size[0]):
+            for j in range(0, image.shape[1], tile_size[1]):
+                tile = image[i : (min(i + tile_size[0], image.shape[0])), j : (min(j + tile_size[1], image.shape[1])), ...]
+                data_bytes = packet.update_image(name, tile, channel_names, x + j, y + i, grab_focus)
+                self._writer.write(data_bytes)
+
+        await self._writer.drain()
+
+    async def update_vector_graphics(self, name: str, commands: list[VgCommand], append: bool = False, grab_focus: bool = False):
+        """
+        Draws vector graphics over the specified image. The vector graphics are drawn using an ordered list of commands; see `ipc-example.py` for an example.
+        """
+
+        if self._writer is None:
+            raise Exception("Communication was not started")
+
+        self._writer.write(packet.update_vector_graphics(name, commands, append, grab_focus))
+        await self._writer.drain()
+
+
 class Ipc:
     def __init__(self, hostname: str = "localhost", port: int = 14158):
         self._hostname: str = hostname

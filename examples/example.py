@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-# tev -- the EXR viewer
+# tevclient
 #
 # Copyright (C) 2025 Thomas Müller <contact@tom94.net>
 #

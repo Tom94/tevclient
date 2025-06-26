@@ -14,7 +14,32 @@ pip install tevclient
 
 ## Usage
 
-The following functions are available:
+Enter a context via the `Ipc` class (or an async context using `IpcAsync`), which will handle the connection to **tev**.
+Then instrument **tev** by calling the various methods of the context.
+
+```python
+import tevclient
+
+with tevclient.Ipc() as tev_ipc:
+# or: async with tevclient.IpcAsync() as tev_ipc:
+
+    # Open an image
+    tev_ipc.open_image("path/to/image.png")
+    # or: await tev_ipc.open_image("path/to/image.png")
+
+    # Create a new image
+    tev_ipc.create_image("My Image", width=800, height=600, channel_names=["R", "G", "B"])
+
+    # Update the image with pixel data
+    import numpy as np
+    image_data = np.random.rand(600, 800, 3)  # Random RGB data
+    tev_ipc.update_image("My Image", image_data, ["R", "G", "B"])
+
+    # Close the image
+    tev_ipc.close_image("My Image")
+```
+
+The following methods are available:
 
 | Operation | Function
 | :--- | :----------
@@ -25,11 +50,12 @@ The following functions are available:
 | `reload_image` | Reloads an image from a specified path on the machine __tev__ is running on.
 | `update_vector_graphics` | Draws vector graphics over a specified image.
 
-Each function comes with type annotations and a docstring, so should be self-explanatory when used in an IDE.
+Each method comes with type annotations and a docstring, so should be self-explanatory when used in an IDE.
 
-## Example
+## Examples
 
-`example.py` demonstrates most available functions in a single script. An abbreviated version is shown below:
+More complete examples than the one above can be found in the `examples/` directory of this repository.
+Below is an excerpt that showcases tilewise updating of an image and drawing vector graphics over it.
 
 ```python
 import time
@@ -82,10 +108,6 @@ with tevclient.Ipc() as tev_ipc:
             idx += 1
             time.sleep(0.1)
 ```
-
-## TODO
-
-- [ ] Add `async` API.
 
 ## License
 
