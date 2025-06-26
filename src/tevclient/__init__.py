@@ -25,49 +25,9 @@ can create, modify, reload, and close images as well as overlay vector graphics.
 __version__ = "1.0.2"
 
 import socket
-import struct
-from enum import IntEnum
 
-import numpy as np
-
-GrayscaleTile = np.ndarray[tuple[int, int], np.dtype[np.float32]]
-ColoredTile = np.ndarray[tuple[int, int, int], np.dtype[np.float32]]
-Tile = GrayscaleTile | ColoredTile
-
-
-class Winding(IntEnum):
-    CounterClockwise = 1
-    Clockwise = 2
-
-
-class VgCommand:
-    class Type(IntEnum):
-        # This stays in sync with `VgCommand::EType` from VectorGraphics.h
-        Save = 0
-        Restore = 1
-        FillColor = 2
-        Fill = 3
-        StrokeColor = 4
-        Stroke = 5
-        BeginPath = 6
-        ClosePath = 7
-        PathWinding = 8
-        DebugDumpPathCache = 9
-        MoveTo = 10
-        LineTo = 11
-        ArcTo = 12
-        Arc = 13
-        BezierTo = 14
-        Circle = 15
-        Ellipse = 16
-        QuadTo = 17
-        Rect = 18
-        RoundedRect = 19
-        RoundedRectVarying = 20
-
-    def __init__(self, type: Type, data: list[float] | None = None):
-        self.type: VgCommand.Type = type
-        self.data: list[float] | None = data
+from . import packet
+from .packet import Tile, VgCommand, Winding
 
 
 def vg_save():
@@ -156,16 +116,6 @@ def vg_rounded_rect_varying(
     return VgCommand(VgCommand.Type.RoundedRectVarying, [x, y, width, height, radius_top_left, radius_top_right, radius_bottom_right, radius_bottom_left])
 
 
-class IpcPacketType(IntEnum):
-    # This stays in sync with `IpcPacket::EType` from Ipc.h
-    OpenImage = 7  # v2
-    ReloadImage = 1
-    CloseImage = 2
-    CreateImage = 4
-    UpdateImage = 6  # v3
-    VectorGraphics = 8
-
-
 class Ipc:
     def __init__(self, hostname: str = "localhost", port: int = 14158):
         self._hostname: str = hostname
@@ -193,17 +143,7 @@ class Ipc:
         if self._socket is None:
             raise Exception("Communication was not started")
 
-        data_bytes = bytearray()
-        data_bytes.extend(struct.pack("<I", 0))  # reserved for length
-        data_bytes.extend(struct.pack("<b", IpcPacketType.OpenImage))
-        data_bytes.extend(struct.pack("<b", grab_focus))
-        data_bytes.extend(bytes(path, "UTF-8"))
-        data_bytes.extend(struct.pack("<b", 0))  # string terminator
-        data_bytes.extend(bytes(channel_selector, "UTF-8"))
-        data_bytes.extend(struct.pack("<b", 0))  # string terminator
-
-        data_bytes[0:4] = struct.pack("<I", len(data_bytes))
-        self._socket.sendall(data_bytes)
+        self._socket.sendall(packet.open_image(path, channel_selector, grab_focus))
 
     def reload_image(self, name: str, grab_focus: bool = True):
         """
@@ -213,15 +153,7 @@ class Ipc:
         if self._socket is None:
             raise Exception("Communication was not started")
 
-        data_bytes = bytearray()
-        data_bytes.extend(struct.pack("<I", 0))  # reserved for length
-        data_bytes.extend(struct.pack("<b", IpcPacketType.ReloadImage))
-        data_bytes.extend(struct.pack("<b", grab_focus))
-        data_bytes.extend(bytes(name, "UTF-8"))
-        data_bytes.extend(struct.pack("<b", 0))  # string terminator
-
-        data_bytes[0:4] = struct.pack("<I", len(data_bytes))
-        self._socket.sendall(data_bytes)
+        self._socket.sendall(packet.reload_image(name, grab_focus))
 
     def close_image(self, name: str):
         """
@@ -231,14 +163,7 @@ class Ipc:
         if self._socket is None:
             raise Exception("Communication was not started")
 
-        data_bytes = bytearray()
-        data_bytes.extend(struct.pack("<I", 0))  # reserved for length
-        data_bytes.extend(struct.pack("<b", IpcPacketType.CloseImage))
-        data_bytes.extend(bytes(name, "UTF-8"))
-        data_bytes.extend(struct.pack("<b", 0))  # string terminator
-
-        data_bytes[0:4] = struct.pack("<I", len(data_bytes))
-        self._socket.sendall(data_bytes)
+        self._socket.sendall(packet.close_image(name))
 
     def create_image(self, name: str, width: int, height: int, channel_names: list[str] | None = None, grab_focus: bool = True):
         """
@@ -248,24 +173,7 @@ class Ipc:
         if self._socket is None:
             raise Exception("Communication was not started")
 
-        if channel_names is None:
-            channel_names = ["R", "G", "B", "A"]
-
-        data_bytes = bytearray()
-        data_bytes.extend(struct.pack("<I", 0))  # reserved for length
-        data_bytes.extend(struct.pack("<b", IpcPacketType.CreateImage))
-        data_bytes.extend(struct.pack("<b", grab_focus))
-        data_bytes.extend(bytes(name, "UTF-8"))
-        data_bytes.extend(struct.pack("<b", 0))  # string terminator
-        data_bytes.extend(struct.pack("<i", width))
-        data_bytes.extend(struct.pack("<i", height))
-        data_bytes.extend(struct.pack("<i", len(channel_names)))
-        for channel_name in channel_names:
-            data_bytes.extend(bytes(channel_name, "ascii"))
-            data_bytes.extend(struct.pack("<b", 0))  # string terminator
-
-        data_bytes[0:4] = struct.pack("<I", len(data_bytes))
-        self._socket.sendall(data_bytes)
+        self._socket.sendall(packet.create_image(name, width, height, channel_names, grab_focus))
 
     def update_image(
         self,
@@ -288,52 +196,12 @@ class Ipc:
         if len(image.shape) < 2 or len(image.shape) > 3:
             raise Exception("Image must be 2D or 3D (with channels)")
 
-        if channel_names is None:
-            channel_names = ["R", "G", "B", "A"]
-
         # Break down image into tiles of manageable size for typical TCP packets
         tile_size = [128, 128] if perform_tiling else image.shape[0:2]
-
-        n_channels = 1 if len(image.shape) < 3 else image.shape[2]
-
-        channel_offsets = [i for i in range(n_channels)]
-        channel_strides = [n_channels for _ in range(n_channels)]
-
-        if len(channel_names) < n_channels:
-            raise Exception("Not enough channel names provided")
-
         for i in range(0, image.shape[0], tile_size[0]):
             for j in range(0, image.shape[1], tile_size[1]):
                 tile = image[i : (min(i + tile_size[0], image.shape[0])), j : (min(j + tile_size[1], image.shape[1])), ...]
-
-                tile_dense = np.full_like(tile, 0.0, dtype="<f")
-                tile_dense[...] = tile[...]
-
-                data_bytes = bytearray()
-                data_bytes.extend(struct.pack("<I", 0))  # reserved for length
-                data_bytes.extend(struct.pack("<b", IpcPacketType.UpdateImage))
-                data_bytes.extend(struct.pack("<b", grab_focus))
-                data_bytes.extend(bytes(name, "UTF-8"))
-                data_bytes.extend(struct.pack("<b", 0))  # string terminator
-                data_bytes.extend(struct.pack("<i", n_channels))
-
-                for channel_name in channel_names[0:n_channels]:
-                    data_bytes.extend(bytes(channel_name, "UTF-8"))
-                    data_bytes.extend(struct.pack("<b", 0))  # string terminator
-
-                data_bytes.extend(struct.pack("<i", x + j))  # x
-                data_bytes.extend(struct.pack("<i", y + i))  # y
-                data_bytes.extend(struct.pack("<i", tile_dense.shape[1]))  # width
-                data_bytes.extend(struct.pack("<i", tile_dense.shape[0]))  # height
-
-                for channel_offset in channel_offsets:
-                    data_bytes.extend(struct.pack("<q", channel_offset))
-                for channel_stride in channel_strides:
-                    data_bytes.extend(struct.pack("<q", channel_stride))
-
-                data_bytes.extend(tile_dense.tobytes())  # data
-
-                data_bytes[0:4] = struct.pack("<I", len(data_bytes))
+                data_bytes = packet.update_image(name, tile, channel_names, x + j, y + i, grab_focus)
                 self._socket.sendall(data_bytes)
 
     def update_vector_graphics(self, name: str, commands: list[VgCommand], append: bool = False, grab_focus: bool = False):
@@ -344,22 +212,7 @@ class Ipc:
         if self._socket is None:
             raise Exception("Communication was not started")
 
-        data_bytes = bytearray()
-        data_bytes.extend(struct.pack("<I", 0))  # reserved for length
-        data_bytes.extend(struct.pack("<b", IpcPacketType.VectorGraphics))
-        data_bytes.extend(struct.pack("<b", grab_focus))
-        data_bytes.extend(bytes(name, "UTF-8"))
-        data_bytes.extend(struct.pack("<b", 0))  # string terminator
-        data_bytes.extend(struct.pack("<b", append))
-        data_bytes.extend(struct.pack("<I", len(commands)))
-        for command in commands:
-            data_bytes.extend(struct.pack("<b", command.type))
-            if command.data is not None:
-                data_bytes.extend(np.array(command.data, dtype="<f").tobytes())
-
-        data_bytes[0:4] = struct.pack("<I", len(data_bytes))
-        self._socket.sendall(data_bytes)
-        pass
+        self._socket.sendall(packet.update_vector_graphics(name, commands, append, grab_focus))
 
 
 # `Ipc` used to be called `TevIpc`, so we keep the alias for backwards compatibility.
