@@ -9,7 +9,7 @@ tev's IPC protocol, allowing you to control tev via a TCP connection. You
 can create, modify, reload, and close images as well as overlay vector graphics.
 """
 
-__version__ = "1.0.3"
+__version__ = "1.0.4"
 
 import socket
 
