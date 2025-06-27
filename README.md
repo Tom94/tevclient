@@ -111,4 +111,4 @@ with tevclient.Ipc() as tev_ipc:
 
 ## License
 
-GPLv3; see [LICENSE](LICENSE.txt) for details.
+BSD 3-Claude; see [LICENSE](LICENSE.txt) for details.

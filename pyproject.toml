@@ -23,7 +23,7 @@ description = "Module for remote-controlling the tev image viewer."
 authors = [{name = "Thomas Müller", email = "tom@94.me"}]
 readme = "README.md"
 requires-python = ">=3.11"
-license = "GPL-3.0-only"
+license = "BSD-3-Clause"
 dependencies = [
     "numpy",
 ]
