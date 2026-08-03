@@ -14,7 +14,13 @@ __version__ = "1.0.4"
 import socket
 
 from . import packet
-from .packet import Tile, VgCommand, Winding
+from .packet import ScaleKind, TextAlign, Tile, VgCommand, Winding
+
+__all__ = [
+    "ScaleKind",
+    "TextAlign",
+    "Winding",
+]
 
 
 def vg_save():
@@ -35,6 +41,10 @@ def vg_fill():
 
 def vg_stroke_color(r: float, g: float, b: float, a: float):
     return VgCommand(VgCommand.Type.StrokeColor, [r, g, b, a])
+
+
+def vg_stroke_width(width: float, scale_kind: ScaleKind = ScaleKind.Relative):
+    return VgCommand(VgCommand.Type.StrokeWidth, [width, float(int(scale_kind))])
 
 
 def vg_stroke():
@@ -101,6 +111,22 @@ def vg_rounded_rect_varying(
     x: float, y: float, width: float, height: float, radius_top_left: float, radius_top_right: float, radius_bottom_right: float, radius_bottom_left: float
 ):
     return VgCommand(VgCommand.Type.RoundedRectVarying, [x, y, width, height, radius_top_left, radius_top_right, radius_bottom_right, radius_bottom_left])
+
+
+def vg_text(x: float, y: float, text: str):
+    return VgCommand(VgCommand.Type.Text, [x, y], text)
+
+
+def vg_text_align(align: TextAlign):
+    return VgCommand(VgCommand.Type.TextAlign, [float(int(align))])
+
+
+def vg_font_face(font_face: str):
+    return VgCommand(VgCommand.Type.FontFace, stringData=font_face)
+
+
+def vg_font_size(size: float, scale_kind: ScaleKind = ScaleKind.Relative):
+    return VgCommand(VgCommand.Type.FontSize, [size, float(int(scale_kind))])
 
 
 class IpcAsync:

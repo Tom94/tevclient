@@ -2,13 +2,28 @@
 # This file is published under the BSD 3-Clause License; see LICENSE.txt
 
 import struct
-from enum import IntEnum
+from enum import IntEnum, IntFlag
 
 import numpy as np
 
 GrayscaleTile = np.ndarray[tuple[int, int], np.dtype[np.float32]]
 ColoredTile = np.ndarray[tuple[int, int, int], np.dtype[np.float32]]
 Tile = GrayscaleTile | ColoredTile
+
+
+class ScaleKind(IntEnum):
+    Relative = 0
+    Absolute = 1
+
+
+class TextAlign(IntFlag):
+    Left = 1 << 0
+    Center = 1 << 1
+    Right = 1 << 2
+    Top = 1 << 3
+    Middle = 1 << 4
+    Bottom = 1 << 5
+    Baseline = 1 << 6
 
 
 class Winding(IntEnum):
@@ -24,6 +39,7 @@ class VgCommand:
         FillColor = 2
         Fill = 3
         StrokeColor = 4
+        StrokeWidth = 25
         Stroke = 5
         BeginPath = 6
         ClosePath = 7
@@ -40,10 +56,15 @@ class VgCommand:
         Rect = 18
         RoundedRect = 19
         RoundedRectVarying = 20
+        Text = 21
+        TextAlign = 22
+        FontFace = 23
+        FontSize = 24
 
-    def __init__(self, type: Type, data: list[float] | None = None):
+    def __init__(self, type: Type, data: list[float] | None = None, stringData: str | None = None):
         self.type: VgCommand.Type = type
         self.data: list[float] | None = data
+        self.stringData: str | None = stringData
 
 
 class IpcPacketType(IntEnum):
@@ -198,6 +219,9 @@ def update_vector_graphics(name: str, commands: list[VgCommand], append: bool = 
         data_bytes.extend(struct.pack("<b", command.type))
         if command.data is not None:
             data_bytes.extend(np.array(command.data, dtype="<f").tobytes())
+        if command.stringData is not None:
+            data_bytes.extend(bytes(command.stringData, "UTF-8"))
+            data_bytes.extend(struct.pack("<b", 0))  # string terminator
 
     data_bytes[0:4] = struct.pack("<I", len(data_bytes))
     return data_bytes
