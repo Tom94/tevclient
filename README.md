@@ -102,6 +102,14 @@ with tevclient.Ipc() as tev_ipc:
                     # tevclient.vg_line_to(x + TILE_SIZE, y),
                     # tevclient.vg_close_path(),
                     tevclient.vg_stroke(),
+                    # Draw tile index as string in bottom left corner
+                    tevclient.vg_font_size(20, tevclient.ScaleKind.Relative),
+                    tevclient.vg_text_align(tevclient.TextAlign.Left | tevclient.TextAlign.Baseline),
+                    tevclient.vg_text(
+                        x + 5,
+                        y + TILE_SIZE - 5,
+                        f"Tile {idx}",
+                    ),
                 ],
             )
 
